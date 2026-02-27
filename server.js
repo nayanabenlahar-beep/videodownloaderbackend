@@ -75,8 +75,26 @@ app.post('/api/media-info', async (req, res) => {
     try {
         // Use 'python' on Windows, 'python3' on Linux/Mac
         const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-        // Try iOS client which works better for YouTube
-        const command = `${pythonCmd} -m yt_dlp -J --no-warnings --skip-download --no-playlist --extractor-args "youtube:player_client=ios" "${url}"`;
+        
+        // Different strategies for different platforms
+        const platform = detectPlatform(url);
+        let extraArgs = '';
+        
+        // Aggressive bypass for all platforms
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        
+        if (platform === 'YouTube') {
+            // Multiple bypass strategies for YouTube
+            extraArgs = `--extractor-args "youtube:player_client=android_creator,ios,web;skip=dash,hls" --user-agent "${userAgent}" --add-header "Accept-Language:en-US,en;q=0.9" --geo-bypass --no-check-certificate`;
+        } else if (platform === 'Instagram') {
+            // Instagram bypass
+            extraArgs = `--user-agent "${userAgent}" --add-header "Accept-Language:en-US,en;q=0.9" --add-header "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" --geo-bypass --no-check-certificate`;
+        } else {
+            // Generic bypass for other platforms
+            extraArgs = `--user-agent "${userAgent}" --geo-bypass --no-check-certificate`;
+        }
+        
+        const command = `${pythonCmd} -m yt_dlp -J --no-warnings --skip-download --no-playlist ${extraArgs} "${url}"`;
         const { stdout } = await execPromise(command, { 
             maxBuffer: 10 * 1024 * 1024,
             timeout: 30000
@@ -95,7 +113,7 @@ app.post('/api/media-info', async (req, res) => {
                 thumbnail: info.thumbnail || info.thumbnails?.[0]?.url,
                 duration: formatDuration(info.duration),
                 uploader: info.uploader || 'Unknown',
-                platform: detectPlatform(url),
+                platform: platform,
                 formats: videoFormats,
                 audioFormatId: audioFormat?.format_id
             }
@@ -104,7 +122,7 @@ app.post('/api/media-info', async (req, res) => {
         console.error('Error fetching media info:', error.message);
         console.error('Full error:', error);
         res.status(500).json({ 
-            error: 'Failed to fetch media info',
+            error: 'Failed to fetch media info. The platform may be blocking server requests.',
             details: error.message 
         });
     }
@@ -138,7 +156,20 @@ app.post('/api/download', async (req, res) => {
             ffmpegLocation = '--ffmpeg-location "C:\\ffmpeg\\bin"';
         }
         
-        const command = `${pythonCmd} -m yt_dlp -f "${format}" ${ffmpegLocation} --merge-output-format mp4 --extractor-args "youtube:player_client=ios" -o "${outputPath}" "${url}"`;
+        // Detect platform and add appropriate bypass flags
+        const platform = detectPlatform(url);
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        let extraArgs = '';
+        
+        if (platform === 'YouTube') {
+            extraArgs = `--extractor-args "youtube:player_client=android_creator,ios,web;skip=dash,hls" --user-agent "${userAgent}" --add-header "Accept-Language:en-US,en;q=0.9" --geo-bypass --no-check-certificate`;
+        } else if (platform === 'Instagram') {
+            extraArgs = `--user-agent "${userAgent}" --add-header "Accept-Language:en-US,en;q=0.9" --add-header "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" --geo-bypass --no-check-certificate`;
+        } else {
+            extraArgs = `--user-agent "${userAgent}" --geo-bypass --no-check-certificate`;
+        }
+        
+        const command = `${pythonCmd} -m yt_dlp -f "${format}" ${ffmpegLocation} --merge-output-format mp4 ${extraArgs} -o "${outputPath}" "${url}"`;
         console.log('Executing command:', command);
         console.log('Platform:', process.platform);
         
