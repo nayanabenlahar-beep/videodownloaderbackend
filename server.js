@@ -75,11 +75,11 @@ app.post('/api/media-info', async (req, res) => {
     try {
         // Use 'python' on Windows, 'python3' on Linux/Mac
         const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-        // Add --skip-download and reduce timeout for faster response
-        const command = `${pythonCmd} -m yt_dlp -J --no-warnings --skip-download --no-playlist "${url}"`;
+        // Add flags to bypass YouTube bot detection
+        const command = `${pythonCmd} -m yt_dlp -J --no-warnings --skip-download --no-playlist --extractor-args "youtube:player_client=android" "${url}"`;
         const { stdout } = await execPromise(command, { 
             maxBuffer: 10 * 1024 * 1024,
-            timeout: 15000  // Reduced from 30s to 15s
+            timeout: 30000  // Increased timeout for YouTube
         });
 
         const info = JSON.parse(stdout);
@@ -134,7 +134,7 @@ app.post('/api/download', async (req, res) => {
             ffmpegLocation = '--ffmpeg-location "C:\\ffmpeg\\bin"';
         }
         
-        const command = `${pythonCmd} -m yt_dlp -f "${format}" ${ffmpegLocation} --merge-output-format mp4 -o "${outputPath}" "${url}"`;
+        const command = `${pythonCmd} -m yt_dlp -f "${format}" ${ffmpegLocation} --merge-output-format mp4 --extractor-args "youtube:player_client=android" -o "${outputPath}" "${url}"`;
         console.log('Executing command:', command);
         console.log('Platform:', process.platform);
         
