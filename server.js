@@ -75,11 +75,11 @@ app.post('/api/media-info', async (req, res) => {
     try {
         // Use 'python' on Windows, 'python3' on Linux/Mac
         const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-        // Add flags to bypass YouTube bot detection
-        const command = `${pythonCmd} -m yt_dlp -J --no-warnings --skip-download --no-playlist --extractor-args "youtube:player_client=android" "${url}"`;
+        // Add multiple flags to bypass YouTube restrictions
+        const command = `${pythonCmd} -m yt_dlp -J --no-warnings --skip-download --no-playlist --extractor-args "youtube:player_client=android,web" --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
         const { stdout } = await execPromise(command, { 
             maxBuffer: 10 * 1024 * 1024,
-            timeout: 30000  // Increased timeout for YouTube
+            timeout: 30000
         });
 
         const info = JSON.parse(stdout);
@@ -101,8 +101,12 @@ app.post('/api/media-info', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'Failed to fetch media info' });
+        console.error('Error fetching media info:', error.message);
+        console.error('Full error:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch media info',
+            details: error.message 
+        });
     }
 });
 
@@ -134,7 +138,7 @@ app.post('/api/download', async (req, res) => {
             ffmpegLocation = '--ffmpeg-location "C:\\ffmpeg\\bin"';
         }
         
-        const command = `${pythonCmd} -m yt_dlp -f "${format}" ${ffmpegLocation} --merge-output-format mp4 --extractor-args "youtube:player_client=android" -o "${outputPath}" "${url}"`;
+        const command = `${pythonCmd} -m yt_dlp -f "${format}" ${ffmpegLocation} --merge-output-format mp4 --extractor-args "youtube:player_client=android,web" --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" "${url}"`;
         console.log('Executing command:', command);
         console.log('Platform:', process.platform);
         
